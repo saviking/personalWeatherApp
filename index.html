@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weather</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Weather">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { margin: 0; padding: 0; height: 100%; }
+  body { margin: 0; padding: 0; background-repeat: no-repeat; background-size: 100% 100%; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #fff;
+    background-color: #131b30;
+    background-image: linear-gradient(170deg, #2b4a86 0%, #1c2a4a 60%, #131b30 100%);
+    min-height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  body.day     { background-color:#1f4f8f; background-image: linear-gradient(170deg, #3d8fe0 0%, #2a6fc0 55%, #1f4f8f 100%); }
+  body.day.cloudy { background-color:#3a5473; background-image: linear-gradient(170deg, #6d8db0 0%, #4f6f94 55%, #3a5473 100%); }
+  body.day.rain   { background-color:#2a3849; background-image: linear-gradient(170deg, #4d6580 0%, #3a4d64 55%, #2a3849 100%); }
+  body.night      { background-color:#0b1020; background-image: linear-gradient(170deg, #1c2a4a 0%, #121a30 60%, #0b1020 100%); }
+  body.night.cloudy { background-color:#12161f; background-image: linear-gradient(170deg, #2b3446 0%, #1d2330 60%, #12161f 100%); }
+
+  .wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 22px 20px 40px;
+    padding-top: calc(22px + constant(safe-area-inset-top));
+    padding-top: calc(22px + env(safe-area-inset-top));
+  }
+
+  /* header */
+  .top { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; }
+  .place { font-size: 28px; font-weight: 600; letter-spacing: -0.3px; }
+  .topend { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+  .topmeta { text-align: right; margin-right: 14px; }
+  /* #updated is empty unless a refresh has failed, so it takes no room normally */
+  #updated { font-size: 14px; margin-top: 2px; }
+  .btn {
+    background: rgba(255,255,255,0.16);
+    border: 0; color: #fff; font: inherit; font-size: 15px;
+    padding: 10px 16px; border-radius: 12px; cursor: pointer;
+  }
+  .btn:active { background: rgba(255,255,255,0.3); }
+  .btn.small { padding: 8px 12px; font-size: 14px; }
+
+  /* clock */
+  .face { width: 200px; height: 200px; margin: 0 auto 10px; }
+  .clock { font-size: 40px; font-weight: 200; line-height: 1; letter-spacing: -1px; }
+  .cdate { font-size: 16px; opacity: 0.78; }
+  .stale { color: #ffc46b; }
+
+  /* night dimming */
+  #dimOverlay {
+    position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+    background: #000; opacity: 0; pointer-events: none; z-index: 5;
+    -webkit-transition: opacity 1s ease; transition: opacity 1s ease;
+  }
+  body.dim #dimOverlay { opacity: 0.68; }
+
+  /* current conditions */
+  .hero { text-align: center; padding: 14px 0 10px; }
+  .hero .icon { width: 120px; height: 120px; margin: 0 auto 4px; }
+  .hero .temp { font-size: 108px; font-weight: 200; line-height: 1; letter-spacing: -4px; }
+  .hero .temp sup { font-size: 40px; font-weight: 300; vertical-align: top; position: relative; top: 14px; letter-spacing: 0; }
+  .hero .cond { font-size: 24px; font-weight: 500; margin-top: 2px; }
+  .hero .range { font-size: 18px; opacity: 0.85; margin-top: 6px; }
+  .stats.secondary { margin-top: 0; }
+
+  /* stat tiles */
+  .stats { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin: 18px -6px 0; }
+  .stat {
+    -webkit-flex: 1 1 28%; flex: 1 1 28%; margin: 6px;
+    background: rgba(255,255,255,0.13); border-radius: 16px; padding: 14px 16px;
+  }
+  .stat { text-align: left; }
+  .stat .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.7; }
+  .stat .v { font-size: 26px; font-weight: 500; margin-top: 4px; }
+  .stat .v small { font-size: 14px; font-weight: 400; opacity: 0.8; margin-left: 2px; }
+  .stat .sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }
+
+  /* section card */
+  .card { background: rgba(255,255,255,0.13); border-radius: 18px; margin-top: 14px; padding: 14px 0 6px; }
+  .card h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.7; margin: 0 16px 10px; }
+
+  /* hourly strip */
+  .hours { display: -webkit-flex; display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0 8px 8px; }
+  .hour { -webkit-flex: 0 0 76px; flex: 0 0 76px; text-align: center; padding: 6px 4px; }
+  .hour .t { font-size: 13px; opacity: 0.8; }
+  .hour .icon { width: 36px; height: 36px; margin: 6px auto; }
+  .hour .d { font-size: 19px; font-weight: 500; }
+  .hour .p { font-size: 12px; color: #9fd7ff; margin-top: 2px; height: 14px; }
+
+  /* daily list */
+  .day-row {
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .day-row:first-of-type { border-top: 0; }
+  .day-row .n { -webkit-flex: 0 0 110px; flex: 0 0 110px; font-size: 17px; }
+  .day-row .icon { width: 32px; height: 32px; -webkit-flex: 0 0 32px; flex: 0 0 32px; }
+  .day-row .p { -webkit-flex: 0 0 60px; flex: 0 0 60px; font-size: 13px; color: #9fd7ff; margin-left: 12px; }
+  .day-row .bar-wrap { -webkit-flex: 1 1 auto; flex: 1 1 auto; margin: 0 14px; height: 6px; background: rgba(0,0,0,0.25); border-radius: 3px; position: relative; }
+  .day-row .bar { position: absolute; top: 0; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #6fc3ff, #ffd36e, #ff8a5c); }
+  .day-row .lo, .day-row .hi { -webkit-flex: 0 0 44px; flex: 0 0 44px; font-size: 17px; text-align: right; }
+  .day-row .lo { opacity: 0.7; }
+
+  .foot { text-align: center; font-size: 12px; opacity: 0.55; margin-top: 18px; }
+  .foot a { color: inherit; }
+
+  /* states */
+  #msg { text-align: center; padding: 60px 20px; font-size: 18px; opacity: 0.85; }
+  #msg .btn { margin-top: 18px; }
+  .hidden { display: none !important; }
+
+  /* settings sheet */
+  #sheet {
+    position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+    background: rgba(10,15,30,0.96); z-index: 10; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 20px; padding-top: calc(20px + env(safe-area-inset-top));
+  }
+  #sheet .inner { max-width: 560px; margin: 0 auto; }
+  #sheet h3 { font-size: 22px; margin: 0 0 14px; }
+  #q {
+    width: 100%; font: inherit; font-size: 18px; padding: 12px 14px; border-radius: 12px;
+    border: 0; background: rgba(255,255,255,0.14); color: #fff; outline: none;
+    -webkit-appearance: none; -webkit-user-select: text; user-select: text;
+  }
+  #q::-webkit-input-placeholder { color: rgba(255,255,255,0.5); }
+  .res { padding: 14px 10px; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 18px; cursor: pointer; }
+  .res small { display: block; font-size: 13px; opacity: 0.65; margin-top: 2px; }
+  .res:active { background: rgba(255,255,255,0.08); }
+  .row { display: -webkit-flex; display: flex; margin-top: 14px; }
+  .row .btn { margin-right: 10px; }
+  .hint { font-size: 13px; opacity: 0.6; margin-top: 12px; line-height: 1.4; }
+
+  /* ---- landscape: SPLIT HERO. Clock and weather share the top half, hourly and
+         daily share a band below. Everything on one screen, no scrolling.
+         Margin-based spacing only: iOS 12 Safari has no flexbox `gap`. ---- */
+  @media (min-width: 900px) {
+    .wrap { max-width: 1180px; padding-bottom: 10px; }
+
+    /* hero */
+    .hero {
+      display: -webkit-flex; display: flex;
+      -webkit-align-items: center; align-items: center;
+      text-align: left; padding: 0; margin-top: 20px;
+    }
+    .clockcol { -webkit-flex: 0 0 auto; flex: 0 0 auto; text-align: center; margin-right: 42px; }
+    .face { width: 250px; height: 250px; margin: 0 auto 8px; }
+    .clock { font-size: 46px; }
+    .cdate { font-size: 18px; }
+
+    .wxcol { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; }
+    .wxrow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+    .hero .icon { width: 110px; height: 110px; margin: 0 22px 0 0; -webkit-flex: 0 0 auto; flex: 0 0 auto; }
+    .hero .temp { font-size: 134px; letter-spacing: -5px; margin-right: 26px; -webkit-flex: 0 0 auto; flex: 0 0 auto; }
+    .hero .temp sup { font-size: 42px; top: 13px; }
+    .condcol { min-width: 0; }
+    .hero .cond { font-size: 33px; margin-top: 0; }
+    .hero .range { font-size: 20px; margin-top: 7px; }
+
+    /* three tiles beside the temperature; the other three drop off the screen */
+    .stats.primary { margin: 18px -7px 0; }
+    .stats.primary .stat { -webkit-flex: 1 1 0; flex: 1 1 0; margin: 0 7px; padding: 13px 17px; }
+    .stats.primary .stat .v { font-size: 34px; }
+    .stats.secondary { display: none; }
+
+    /* band: hourly and daily side by side */
+    .panel {
+      display: -webkit-flex; display: flex;
+      -webkit-align-items: stretch; align-items: stretch;
+      margin-top: 20px;
+    }
+    .panel .card {
+      -webkit-flex: 1 1 0; flex: 1 1 0; min-width: 0; margin-top: 0; padding: 12px 0 8px;
+      display: -webkit-flex; display: flex;
+      -webkit-flex-direction: column; flex-direction: column;
+    }
+    .panel .hours-card { -webkit-flex: 1.5 1 0; flex: 1.5 1 0; margin-right: 18px; }
+    .card h2 { margin-bottom: 8px; }
+
+    /* exactly seven hours, spread across the card and vertically centred */
+    .hours {
+      overflow: hidden; padding: 0 10px;
+      -webkit-flex: 1 1 auto; flex: 1 1 auto;
+      -webkit-align-items: center; align-items: center;
+    }
+    .hour { -webkit-flex: 1 1 0; flex: 1 1 0; min-width: 0; padding: 2px; }
+    .hour .t { font-size: 16px; }
+    .hour .icon { width: 42px; height: 42px; margin: 5px auto; }
+    .hour .d { font-size: 26px; }
+    .hour .p { font-size: 13px; height: 16px; }
+    .hours .hour:nth-child(n+8) { display: none; }
+
+    /* four days, no range bar — the numbers read better at a distance */
+    .day-row { padding: 8px 20px; }
+    .day-row .n { -webkit-flex: 1 1 auto; flex: 1 1 auto; font-size: 19px; }
+    .day-row .icon { width: 28px; height: 28px; -webkit-flex: 0 0 28px; flex: 0 0 28px; }
+    .day-row .p { -webkit-flex: 0 0 52px; flex: 0 0 52px; font-size: 15px; margin-left: 10px; }
+    .day-row .bar-wrap { display: none; }
+    .day-row .lo, .day-row .hi { -webkit-flex: 0 0 46px; flex: 0 0 46px; font-size: 19px; }
+    .day-row .lo { margin-right: 16px; }
+    #days .day-row:nth-child(n+5) { display: none; }
+
+    .foot { display: none; }
+  }
+
+  /* ---- full-height landscape (added to the home screen): use the extra room ---- */
+  @media (min-width: 900px) and (min-height: 740px) {
+    .hero { margin-top: 24px; }
+    .face { width: 292px; height: 292px; }
+    .clock { font-size: 48px; }
+    .hero .icon { width: 118px; height: 118px; }
+    .hero .temp { font-size: 144px; }
+    .hero .temp sup { font-size: 45px; top: 14px; }
+    .panel { margin-top: 22px; }
+    .hour .icon { width: 45px; height: 45px; }
+    .hour .d { font-size: 27px; }
+    .day-row { padding: 11px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div class="place"><span id="placeName">Loading</span></div>
+    <div class="topend">
+      <div class="topmeta">
+        <div class="cdate" id="clockDate"></div>
+        <div id="updated"></div>
+      </div>
+      <button class="btn" id="openSettings">Location</button>
+    </div>
+  </div>
+
+  <div id="msg" class="hidden"></div>
+
+  <div id="main" class="hidden">
+    <div class="hero">
+     <div class="clockcol">
+      <div class="face" id="face">
+        <svg viewBox="0 0 200 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="100" cy="100" r="95" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.28)" stroke-width="2"/>
+          <g id="ticks" stroke="#fff" stroke-linecap="round"></g>
+          <line id="hHand" x1="100" y1="100" x2="100" y2="48" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+          <line id="mHand" x1="100" y1="100" x2="100" y2="26" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+          <g id="sHand">
+            <line x1="100" y1="112" x2="100" y2="22" stroke="#ffd54a" stroke-width="2" stroke-linecap="round"/>
+          </g>
+          <circle cx="100" cy="100" r="5" fill="#fff"/>
+          <circle cx="100" cy="100" r="2.2" fill="#ffd54a"/>
+        </svg>
+      </div>
+      <div class="clock" id="clockTime">--:--</div>
+     </div>
+     <div class="wxcol">
+      <div class="wxrow">
+        <div class="icon" id="curIcon"></div>
+        <div class="temp"><span id="curTemp">--</span><sup>°C</sup></div>
+        <div class="condcol">
+          <div class="cond" id="curCond"></div>
+          <div class="range" id="curRange"></div>
+        </div>
+      </div>
+      <div class="stats primary">
+        <div class="stat"><div class="k">Feels like</div><div class="v" id="feels"></div></div>
+        <div class="stat"><div class="k">Wind</div><div class="v" id="wind"></div></div>
+        <div class="stat"><div class="k">Rain today</div><div class="v" id="rain"></div></div>
+      </div>
+     </div>
+    </div>
+
+    <div class="panel">
+      <div class="stats secondary">
+        <div class="stat"><div class="k">Humidity</div><div class="v" id="hum"></div></div>
+        <div class="stat"><div class="k">Sunrise</div><div class="v" id="sunrise"></div></div>
+        <div class="stat"><div class="k">Sunset</div><div class="v" id="sunset"></div></div>
+      </div>
+
+      <div class="card hours-card">
+        <h2 id="hoursTitle">Next 24 hours</h2>
+        <div class="hours" id="hours"></div>
+      </div>
+
+      <div class="card days-card">
+        <h2 id="daysTitle">7-day forecast</h2>
+        <div id="days"></div>
+      </div>
+
+      <div class="foot">Data: <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> · Tap the temperature to refresh · auto-refreshes every 15 min</div>
+    </div>
+  </div>
+</div>
+
+<div id="dimOverlay"></div>
+
+<div id="sheet" class="hidden">
+  <div class="inner">
+    <h3>Choose location</h3>
+    <input id="q" type="search" placeholder="Search a town or city" autocomplete="off" autocorrect="off" autocapitalize="off">
+    <div id="results"></div>
+    <div class="row">
+      <button class="btn" id="useGps">Use my location</button>
+      <button class="btn" id="dimToggle">Night dimming: on</button>
+      <button class="btn" id="closeSettings">Close</button>
+    </div>
+    <div class="hint" id="gpsHint"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- config ----------
+  // Generic default so nothing personal ships in the file. Tap Location once on the
+  // iPad to set the real spot — it is saved on the device, not in this page.
+  var DEFAULT_LOC = { name: 'Johannesburg', region: 'Gauteng, South Africa', lat: -26.205, lon: 28.049 };
+  var REFRESH_MS = 15 * 60 * 1000;
+  var API = 'https://api.open-meteo.com/v1/forecast';
+  var GEO = 'https://geocoding-api.open-meteo.com/v1/search';
+
+  // ---------- storage (best effort) ----------
+  function loadLoc() {
+    try { var s = localStorage.getItem('loc'); if (s) return JSON.parse(s); } catch (e) {}
+    return DEFAULT_LOC;
+  }
+  function saveLoc(l) { try { localStorage.setItem('loc', JSON.stringify(l)); } catch (e) {} }
+
+  var loc = loadLoc();
+  var timer = null;
+  var hasData = false;      // have we ever rendered real weather?
+  var lastGood = null;      // time of last successful fetch
+  var bodyBase = '';        // weather mood class, before the dim class
+  var sunRiseMin = null, sunSetMin = null;   // minutes-of-day
+  var wakeUntil = 0;        // tap-to-brighten expiry
+  var dimOn = true;
+  try { dimOn = localStorage.getItem('dim') !== '0'; } catch (e) {}
+
+  // ---------- dom ----------
+  function $(id) { return document.getElementById(id); }
+  var el = {
+    placeName: $('placeName'), updated: $('updated'), msg: $('msg'), main: $('main'),
+    curIcon: $('curIcon'), curTemp: $('curTemp'), curCond: $('curCond'), curRange: $('curRange'),
+    feels: $('feels'), wind: $('wind'), hum: $('hum'), rain: $('rain'), sunrise: $('sunrise'), sunset: $('sunset'),
+    hours: $('hours'), days: $('days'),
+    sheet: $('sheet'), q: $('q'), results: $('results'), gpsHint: $('gpsHint'),
+    face: $('face'), clockTime: $('clockTime'), clockDate: $('clockDate'),
+    hoursTitle: $('hoursTitle'), daysTitle: $('daysTitle'),
+    hHand: $('hHand'), mHand: $('mHand'), sHand: $('sHand'), ticks: $('ticks'),
+    wrap: document.getElementsByClassName('wrap')[0]
+  };
+
+  // ---------- WMO weather codes ----------
+  // returns { text, icon } where icon is one of: sun, moon, psun, pmoon, cloud, fog, drizzle, rain, snow, storm
+  function wmo(code, isDay) {
+    var d = isDay !== 0;
+    if (code === 0) return { text: 'Clear', icon: d ? 'sun' : 'moon' };
+    if (code === 1) return { text: 'Mainly clear', icon: d ? 'sun' : 'moon' };
+    if (code === 2) return { text: 'Partly cloudy', icon: d ? 'psun' : 'pmoon' };
+    if (code === 3) return { text: 'Overcast', icon: 'cloud' };
+    if (code === 45 || code === 48) return { text: 'Fog', icon: 'fog' };
+    if (code >= 51 && code <= 57) return { text: 'Drizzle', icon: 'drizzle' };
+    if (code >= 61 && code <= 67) return { text: code >= 65 ? 'Heavy rain' : 'Rain', icon: 'rain' };
+    if (code >= 71 && code <= 77) return { text: 'Snow', icon: 'snow' };
+    if (code >= 80 && code <= 82) return { text: 'Showers', icon: 'rain' };
+    if (code === 85 || code === 86) return { text: 'Snow showers', icon: 'snow' };
+    if (code === 95) return { text: 'Thunderstorm', icon: 'storm' };
+    if (code === 96 || code === 99) return { text: 'Thunderstorm, hail', icon: 'storm' };
+    return { text: 'Unknown', icon: 'cloud' };
+  }
+
+  // ---------- inline SVG icons ----------
+  var SUN = '<circle cx="32" cy="32" r="12" fill="#ffd54a"/><g stroke="#ffd54a" stroke-width="4" stroke-linecap="round">' +
+    '<line x1="32" y1="6" x2="32" y2="13"/><line x1="32" y1="51" x2="32" y2="58"/><line x1="6" y1="32" x2="13" y2="32"/><line x1="51" y1="32" x2="58" y2="32"/>' +
+    '<line x1="13.6" y1="13.6" x2="18.6" y2="18.6"/><line x1="45.4" y1="45.4" x2="50.4" y2="50.4"/><line x1="13.6" y1="50.4" x2="18.6" y2="45.4"/><line x1="45.4" y1="18.6" x2="50.4" y2="13.6"/></g>';
+  var MOON = '<path d="M40 8a22 22 0 1 0 16 36A18 18 0 0 1 40 8z" fill="#f3f3f3"/>';
+  var CLOUD = '<path d="M20 50h26a11 11 0 0 0 1-22 14 14 0 0 0-27 3 9.5 9.5 0 0 0 0 19z" fill="#fff" opacity="0.95"/>';
+  var CLOUD_DK = '<path d="M20 46h26a11 11 0 0 0 1-22 14 14 0 0 0-27 3 9.5 9.5 0 0 0 0 19z" fill="#d9dde3"/>';
+  function smallSun() { return '<g transform="translate(14 6) scale(0.55)">' + SUN + '</g>'; }
+  function smallMoon() { return '<g transform="translate(14 2) scale(0.55)">' + MOON + '</g>'; }
+  var ICONS = {
+    sun: SUN,
+    moon: MOON,
+    psun: smallSun() + CLOUD,
+    pmoon: smallMoon() + CLOUD,
+    cloud: CLOUD,
+    fog: CLOUD_DK + '<g stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.8"><line x1="14" y1="54" x2="50" y2="54"/><line x1="20" y1="60" x2="44" y2="60"/></g>',
+    drizzle: CLOUD_DK + '<g stroke="#9fd7ff" stroke-width="3" stroke-linecap="round"><line x1="24" y1="52" x2="23" y2="56"/><line x1="33" y1="52" x2="32" y2="56"/><line x1="42" y1="52" x2="41" y2="56"/></g>',
+    rain: CLOUD_DK + '<g stroke="#9fd7ff" stroke-width="3" stroke-linecap="round"><line x1="24" y1="51" x2="21" y2="60"/><line x1="33" y1="51" x2="30" y2="60"/><line x1="42" y1="51" x2="39" y2="60"/></g>',
+    snow: CLOUD_DK + '<g fill="#fff"><circle cx="24" cy="55" r="2.5"/><circle cx="33" cy="59" r="2.5"/><circle cx="42" cy="55" r="2.5"/></g>',
+    storm: CLOUD_DK + '<path d="M34 46l-7 11h6l-3 9 9-13h-6l3-7z" fill="#ffd54a"/>'
+  };
+  function icon(name) {
+    return '<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">' + (ICONS[name] || ICONS.cloud) + '</svg>';
+  }
+
+  // ---------- helpers ----------
+  // Open-Meteo returns "YYYY-MM-DDTHH:MM" in the location's own timezone.
+  // Old Safari cannot parse that string, so build the Date by hand (as local wall-clock time).
+  function parseT(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(s);
+    if (!m) return new Date(NaN);
+    return new Date(+m[1], +m[2] - 1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0, 0, 0);
+  }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function hhmm(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function hourLabel(d, now) {
+    if (d.getHours() === now.getHours() && d.getDate() === now.getDate()) return 'Now';
+    return pad(d.getHours()) + ':00';
+  }
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function dayLabel(d, i) { return i === 0 ? 'Today' : DAYS[d.getDay()]; }
+  function r(n) { return Math.round(n); }
+  function compass(deg) {
+    var p = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    return p[Math.round(deg / 45) % 8];
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function getJSON(url) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      x.open('GET', url, true);
+      x.timeout = 15000;
+      x.onload = function () {
+        if (x.status >= 200 && x.status < 300) {
+          try { resolve(JSON.parse(x.responseText)); } catch (e) { reject(new Error('Bad response')); }
+        } else reject(new Error('HTTP ' + x.status));
+      };
+      x.onerror = function () { reject(new Error('Network error')); };
+      x.ontimeout = function () { reject(new Error('Timed out')); };
+      x.send();
+    });
+  }
+
+  function showMsg(html) {
+    el.msg.innerHTML = html;
+    el.msg.classList.remove('hidden');
+    el.main.classList.add('hidden');
+  }
+
+  // ---------- fetch + render ----------
+  function load() {
+    el.placeName.textContent = loc.name;
+
+    var url = API +
+      '?latitude=' + loc.lat + '&longitude=' + loc.lon +
+      '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m' +
+      '&hourly=temperature_2m,precipitation_probability,weather_code,is_day' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset' +
+      '&timezone=auto&forecast_days=7&wind_speed_unit=kmh';
+
+    getJSON(url).then(render, function (err) {
+      if (hasData) {
+        // Keep the last good screen up — a Wi-Fi blip must not blank a bedside display.
+        el.updated.innerHTML = '<span class="stale">Offline \u00b7 ' + hhmm(lastGood) + '</span>';
+        clearTimeout(timer);
+        timer = setTimeout(load, 60000);   // retry every minute until it comes back
+      } else {
+        showMsg('Could not load weather.<br><small>' + esc(err.message) + '</small><br>' +
+          '<button class="btn" id="retry">Try again</button>');
+        $('retry').onclick = load;
+      }
+    });
+  }
+
+  function render(d) {
+    var c = d.current, h = d.hourly, dy = d.daily;
+    var now = parseT(c.time);
+    var cur = wmo(c.weather_code, c.is_day);
+
+    // background mood
+    var cls = (c.is_day ? 'day' : 'night');
+    if (cur.icon === 'rain' || cur.icon === 'drizzle' || cur.icon === 'storm' || cur.icon === 'snow') cls += ' rain';
+    else if (cur.icon === 'cloud' || cur.icon === 'fog') cls += ' cloudy';
+    bodyBase = cls;
+    applyDim();
+
+    el.placeName.textContent = loc.name;
+    el.updated.textContent = '';   // only speaks up when a refresh has failed
+
+    el.curIcon.innerHTML = icon(cur.icon);
+    el.curTemp.textContent = r(c.temperature_2m);
+    el.curCond.textContent = cur.text;
+    el.curRange.textContent = 'High ' + r(dy.temperature_2m_max[0]) + '°  ·  Low ' + r(dy.temperature_2m_min[0]) + '°';
+
+    el.feels.innerHTML = r(c.apparent_temperature) + '<small>°C</small>';
+    el.wind.innerHTML = r(c.wind_speed_10m) + '<small>km/h ' + compass(c.wind_direction_10m) + '</small>' +
+      (c.wind_gusts_10m >= c.wind_speed_10m + 15 ? '<div class="sub">Gusts ' + r(c.wind_gusts_10m) + ' km/h</div>' : '');
+    el.hum.innerHTML = r(c.relative_humidity_2m) + '<small>%</small>';
+    el.rain.innerHTML = (dy.precipitation_probability_max[0] == null ? '–' : dy.precipitation_probability_max[0]) + '<small>% · ' +
+      (dy.precipitation_sum[0] || 0).toFixed(1) + ' mm</small>';
+    var sr = parseT(dy.sunrise[0]), ss = parseT(dy.sunset[0]);
+    el.sunrise.textContent = hhmm(sr);
+    el.sunset.textContent = hhmm(ss);
+    sunRiseMin = sr.getHours() * 60 + sr.getMinutes();
+    sunSetMin = ss.getHours() * 60 + ss.getMinutes();
+    hasData = true;
+    lastGood = new Date();
+
+    // hourly: from the current hour, next 24
+    var start = 0;
+    for (var i = 0; i < h.time.length; i++) {
+      var t = parseT(h.time[i]);
+      if (t.getTime() >= now.getTime() - 59 * 60 * 1000) { start = i; break; }
+    }
+    var out = '';
+    for (var j = start; j < Math.min(start + 24, h.time.length); j++) {
+      var ht = parseT(h.time[j]);
+      var w = wmo(h.weather_code[j], h.is_day[j]);
+      var pp = h.precipitation_probability[j];
+      out += '<div class="hour"><div class="t">' + hourLabel(ht, now) + '</div>' +
+        '<div class="icon">' + icon(w.icon) + '</div>' +
+        '<div class="d">' + r(h.temperature_2m[j]) + '°</div>' +
+        '<div class="p">' + (pp != null && pp >= 20 ? pp + '%' : '') + '</div></div>';
+    }
+    el.hours.innerHTML = out;
+
+    // daily
+    var minAll = Infinity, maxAll = -Infinity;
+    for (var k = 0; k < dy.time.length; k++) {
+      minAll = Math.min(minAll, dy.temperature_2m_min[k]);
+      maxAll = Math.max(maxAll, dy.temperature_2m_max[k]);
+    }
+    var span = Math.max(1, maxAll - minAll);
+    out = '';
+    for (var m = 0; m < dy.time.length; m++) {
+      var dd = parseT(dy.time[m]);
+      var dw = wmo(dy.weather_code[m], 1);
+      var lo = dy.temperature_2m_min[m], hi = dy.temperature_2m_max[m];
+      var left = ((lo - minAll) / span * 100).toFixed(1), width = ((hi - lo) / span * 100).toFixed(1);
+      var p = dy.precipitation_probability_max[m];
+      out += '<div class="day-row"><div class="n">' + dayLabel(dd, m) + '</div>' +
+        '<div class="icon">' + icon(dw.icon) + '</div>' +
+        '<div class="p">' + (p != null && p >= 20 ? p + '%' : '') + '</div>' +
+        '<div class="lo">' + r(lo) + '°</div>' +
+        '<div class="bar-wrap"><div class="bar" style="left:' + left + '%;width:' + width + '%"></div></div>' +
+        '<div class="hi">' + r(hi) + '°</div></div>';
+    }
+    el.days.innerHTML = out;
+
+    el.msg.classList.add('hidden');
+    el.main.classList.remove('hidden');
+
+    applyDim();   // sun times are known only now, so re-evaluate immediately
+
+    clearTimeout(timer);
+    timer = setTimeout(load, REFRESH_MS);
+  }
+
+  // ---------- location sheet ----------
+  var secure = (location.protocol === 'https:') || location.hostname === 'localhost';
+  $('openSettings').onclick = function () {
+    el.sheet.classList.remove('hidden');
+    el.results.innerHTML = '';
+    el.q.value = '';
+    el.gpsHint.textContent = secure ? '' : 'GPS only works when the app is opened over https. Search for your town instead.';
+    setTimeout(function () { el.q.focus(); }, 50);
+  };
+  $('closeSettings').onclick = function () { el.sheet.classList.add('hidden'); };
+
+  var searchTimer = null;
+  el.q.oninput = function () {
+    clearTimeout(searchTimer);
+    var q = el.q.value.trim();
+    if (q.length < 2) { el.results.innerHTML = ''; return; }
+    searchTimer = setTimeout(function () {
+      getJSON(GEO + '?name=' + encodeURIComponent(q) + '&count=8&language=en&format=json').then(function (res) {
+        var list = res.results || [];
+        if (!list.length) { el.results.innerHTML = '<div class="hint">No matches.</div>'; return; }
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+          var x = list[i];
+          var region = [x.admin1, x.country].filter(Boolean).join(', ');
+          html += '<div class="res" data-i="' + i + '">' + esc(x.name) + '<small>' + esc(region) + '</small></div>';
+        }
+        el.results.innerHTML = html;
+        var nodes = el.results.getElementsByClassName('res');
+        for (var n = 0; n < nodes.length; n++) {
+          nodes[n].onclick = (function (x) {
+            return function () {
+              setLoc({ name: x.name, region: [x.admin1, x.country].filter(Boolean).join(', '), lat: x.latitude, lon: x.longitude });
+            };
+          })(list[+nodes[n].getAttribute('data-i')]);
+        }
+      }, function () { el.results.innerHTML = '<div class="hint">Search failed. Check the connection.</div>'; });
+    }, 350);
+  };
+
+  $('useGps').onclick = function () {
+    if (!navigator.geolocation) { el.gpsHint.textContent = 'Location services not available.'; return; }
+    if (!secure) { el.gpsHint.textContent = 'GPS needs https. Search for your town instead.'; return; }
+    el.gpsHint.textContent = 'Locating…';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var lat = pos.coords.latitude, lon = pos.coords.longitude;
+      setLoc({ name: 'My location', region: lat.toFixed(2) + ', ' + lon.toFixed(2), lat: lat, lon: lon });
+    }, function (err) {
+      el.gpsHint.textContent = 'Could not get location (' + (err.message || 'denied') + '). Search instead.';
+    }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 });
+  };
+
+  function setLoc(l) {
+    loc = l; saveLoc(l);
+    el.sheet.classList.add('hidden');
+    load();
+  }
+
+  // ---------- card headings follow the layout ----------
+  // Landscape shows 7 hours and 4 days; portrait shows the lot. Say what is on screen.
+  var wideMQ = window.matchMedia ? window.matchMedia('(min-width: 900px)') : null;
+  function isWide() { return wideMQ ? wideMQ.matches : (window.innerWidth >= 900); }
+  function paintTitles() {
+    el.hoursTitle.textContent = isWide() ? 'Next 7 hours' : 'Next 24 hours';
+    el.daysTitle.textContent  = isWide() ? 'Next 4 days'  : '7-day forecast';
+  }
+  paintTitles();
+  window.addEventListener('resize', paintTitles, false);
+  window.addEventListener('orientationchange', function () { setTimeout(paintTitles, 250); }, false);
+
+  // ---------- analogue clock ----------
+  (function buildTicks() {
+    var out = '';
+    for (var i = 0; i < 60; i++) {
+      var major = (i % 5 === 0);
+      var a = i * 6 * Math.PI / 180;
+      var r1 = major ? 78 : 84, r2 = 88;
+      var x1 = 100 + r1 * Math.sin(a), y1 = 100 - r1 * Math.cos(a);
+      var x2 = 100 + r2 * Math.sin(a), y2 = 100 - r2 * Math.cos(a);
+      out += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) +
+             '" y2="' + y2.toFixed(1) + '" stroke-width="' + (major ? 3 : 1.2) +
+             '" opacity="' + (major ? 0.95 : 0.4) + '"/>';
+    }
+    el.ticks.innerHTML = out;
+  })();
+
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var lastMin = -1;
+
+  function tick() {
+    var n = new Date();
+    var h = n.getHours(), m = n.getMinutes(), sec = n.getSeconds();
+
+    el.hHand.setAttribute('transform', 'rotate(' + ((h % 12) * 30 + m * 0.5) + ' 100 100)');
+    el.mHand.setAttribute('transform', 'rotate(' + (m * 6 + sec * 0.1) + ' 100 100)');
+    el.sHand.setAttribute('transform', 'rotate(' + (sec * 6) + ' 100 100)');
+
+    if (m !== lastMin) {
+      lastMin = m;
+      el.clockTime.textContent = pad(h) + ':' + pad(m);
+      el.clockDate.textContent = DAYS[n.getDay()] + ', ' + n.getDate() + ' ' + MONTHS[n.getMonth()];
+      applyDim();
+      shiftPixels(n);
+    }
+  }
+
+  // ---------- night dimming ----------
+  function isNight(n) {
+    if (sunRiseMin === null) return false;
+    var m = n.getHours() * 60 + n.getMinutes();
+    return (m < sunRiseMin) || (m >= sunSetMin);
+  }
+  function applyDim() {
+    var want = dimOn && isNight(new Date()) && Date.now() > wakeUntil;
+    var cls = bodyBase + (want ? ' dim' : '');
+    if (document.body.className !== cls) document.body.className = cls;
+  }
+  function wake() {
+    if (dimOn && isNight(new Date())) { wakeUntil = Date.now() + 30000; applyDim(); }
+  }
+
+  // ---------- pixel shift: nudges the layout a couple of px so a 24/7 static
+  // image doesn't sit on exactly the same pixels for months ----------
+  var SHIFTS = [[0,0],[2,1],[3,-1],[1,2],[-2,1],[-3,-1],[-1,-2],[2,-2]];
+  function shiftPixels(n) {
+    var i = Math.floor((n.getHours() * 60 + n.getMinutes()) / 10) % SHIFTS.length;
+    el.wrap.style.webkitTransform = 'translate(' + SHIFTS[i][0] + 'px,' + SHIFTS[i][1] + 'px)';
+    el.wrap.style.transform = 'translate(' + SHIFTS[i][0] + 'px,' + SHIFTS[i][1] + 'px)';
+  }
+
+  tick();
+  setInterval(tick, 1000);
+
+  // ---------- night-dim toggle ----------
+  function paintDimBtn() { $('dimToggle').textContent = 'Night dimming: ' + (dimOn ? 'on' : 'off'); }
+  paintDimBtn();
+  $('dimToggle').onclick = function () {
+    dimOn = !dimOn;
+    try { localStorage.setItem('dim', dimOn ? '1' : '0'); } catch (e) {}
+    paintDimBtn(); wakeUntil = 0; applyDim();
+  };
+
+  // a tap anywhere brightens the screen for 30s at night
+  document.addEventListener('touchstart', wake, false);
+  document.addEventListener('click', wake, false);
+
+  // tap the temperature to refresh; refresh when app comes back to foreground
+  el.curTemp.parentNode.onclick = load;
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
