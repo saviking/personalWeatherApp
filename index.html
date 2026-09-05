@@ -41,9 +41,14 @@
 
   /* header */
   .top { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; }
-  .place { font-size: 28px; font-weight: 600; letter-spacing: -0.3px; }
-  .topend { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
-  .topmeta { text-align: right; margin-right: 14px; }
+  .place { font-size: 28px; font-weight: 600; letter-spacing: -0.3px; -webkit-flex: 1 1 0; flex: 1 1 0; min-width: 0; }
+  .topend {
+    display: -webkit-flex; display: flex;
+    -webkit-align-items: center; align-items: center;
+    -webkit-justify-content: flex-end; justify-content: flex-end;
+    -webkit-flex: 1 1 0; flex: 1 1 0;
+  }
+  .topmeta { -webkit-flex: 0 1 auto; flex: 0 1 auto; text-align: center; padding: 0 14px; min-width: 0; }
   /* #updated is empty unless a refresh has failed, so it takes no room normally */
   #updated { font-size: 14px; margin-top: 2px; }
   .btn {
@@ -57,7 +62,7 @@
   /* clock */
   .face { width: 200px; height: 200px; margin: 0 auto 10px; }
   .clock { font-size: 40px; font-weight: 200; line-height: 1; letter-spacing: -1px; }
-  .cdate { font-size: 16px; opacity: 0.78; }
+  .cdate { font-size: 20px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stale { color: #ffc46b; }
 
   /* night dimming */
@@ -159,7 +164,7 @@
     .clockcol { -webkit-flex: 0 0 auto; flex: 0 0 auto; text-align: center; margin-right: 42px; }
     .face { width: 250px; height: 250px; margin: 0 auto 8px; }
     .clock { font-size: 46px; }
-    .cdate { font-size: 18px; }
+    .cdate { font-size: 30px; font-weight: 400; }
 
     .wxcol { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; }
     .wxrow { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
@@ -236,11 +241,11 @@
 <div class="wrap">
   <div class="top">
     <div class="place"><span id="placeName">Loading</span></div>
+    <div class="topmeta">
+      <div class="cdate" id="clockDate"></div>
+      <div id="updated"></div>
+    </div>
     <div class="topend">
-      <div class="topmeta">
-        <div class="cdate" id="clockDate"></div>
-        <div id="updated"></div>
-      </div>
       <button class="btn" id="openSettings">Location</button>
     </div>
   </div>
