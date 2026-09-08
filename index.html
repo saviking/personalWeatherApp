@@ -51,6 +51,14 @@
   .topmeta { -webkit-flex: 0 1 auto; flex: 0 1 auto; text-align: center; padding: 0 14px; min-width: 0; }
   /* #updated is empty unless a refresh has failed, so it takes no room normally */
   #updated { font-size: 14px; margin-top: 2px; }
+  /* days-left countdown, sized to sit inside the header's existing height */
+  .countdown { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-right: 14px; }
+  .cd { text-align: center; padding: 0 11px; border-left: 1px solid rgba(255,255,255,0.16); }
+  .cd:first-child { border-left: 0; }
+  .cdk { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.6; white-space: nowrap; }
+  .cdv { font-size: 21px; font-weight: 500; line-height: 1.15; margin-top: 1px; }
+  .cdv small { font-size: 12px; font-weight: 400; opacity: 0.7; margin-left: 1px; }
+
   .btn {
     background: rgba(255,255,255,0.16);
     border: 0; color: #fff; font: inherit; font-size: 15px;
@@ -89,6 +97,8 @@
     background: rgba(255,255,255,0.13); border-radius: 16px; padding: 14px 16px;
   }
   .stat { text-align: left; }
+  /* extra hero tiles that only appear in landscape, where the secondary row is hidden */
+  .stat.x-wide { display: none; }
   .stat .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.7; }
   .stat .v { font-size: 26px; font-weight: 500; margin-top: 4px; }
   .stat .v small { font-size: 14px; font-weight: 400; opacity: 0.8; margin-left: 2px; }
@@ -153,7 +163,7 @@
          daily share a band below. Everything on one screen, no scrolling.
          Margin-based spacing only: iOS 12 Safari has no flexbox `gap`. ---- */
   @media (min-width: 900px) {
-    .wrap { max-width: 1180px; padding-bottom: 10px; }
+    .wrap { max-width: 1180px; padding-bottom: 10px; position: relative; }
 
     /* hero */
     .hero {
@@ -175,10 +185,12 @@
     .hero .cond { font-size: 33px; margin-top: 0; }
     .hero .range { font-size: 20px; margin-top: 7px; }
 
-    /* three tiles beside the temperature; the other three drop off the screen */
-    .stats.primary { margin: 18px -7px 0; }
-    .stats.primary .stat { -webkit-flex: 1 1 0; flex: 1 1 0; margin: 0 7px; padding: 13px 17px; }
-    .stats.primary .stat .v { font-size: 34px; }
+    /* five tiles beside the temperature. The secondary row is hidden here, so
+       humidity and sunset ride along in the hero rather than vanishing. */
+    .stats.primary { margin: 18px -7px 0; -webkit-flex-wrap: nowrap; flex-wrap: nowrap; }
+    .stats.primary .stat { -webkit-flex: 1 1 0; flex: 1 1 0; margin: 0 7px; padding: 13px 12px; min-width: 0; }
+    .stats.primary .stat .v { font-size: 30px; white-space: nowrap; }
+    .stats.primary .stat.x-wide { display: block; }
     .stats.secondary { display: none; }
 
     /* band: hourly and daily side by side */
@@ -218,7 +230,14 @@
     .day-row .lo { margin-right: 16px; }
     #days .day-row:nth-child(n+5) { display: none; }
 
-    .foot { display: none; }
+    /* Attribution stays visible but out of flow, so it costs no vertical space
+       on a screen that has about 15px to spare. Absolute against .wrap, not fixed:
+       the burn-in shift puts a transform on .wrap, which would capture fixed anyway. */
+    .foot {
+      position: absolute; right: 12px; bottom: 0; margin: 0;
+      font-size: 10px; opacity: 0.35; text-align: right; z-index: 4;
+    }
+    .foot .tip { display: none; }
   }
 
   /* ---- full-height landscape (added to the home screen): use the extra room ---- */
@@ -246,6 +265,10 @@
       <div id="updated"></div>
     </div>
     <div class="topend">
+      <div class="countdown">
+        <div class="cd"><div class="cdk" id="cdMonthK">Month</div><div class="cdv" id="cdMonth">–</div></div>
+        <div class="cd"><div class="cdk" id="cdYearK">Year</div><div class="cdv" id="cdYear">–</div></div>
+      </div>
       <button class="btn" id="openSettings">Location</button>
     </div>
   </div>
@@ -283,6 +306,8 @@
         <div class="stat"><div class="k">Feels like</div><div class="v" id="feels"></div></div>
         <div class="stat"><div class="k">Wind</div><div class="v" id="wind"></div></div>
         <div class="stat"><div class="k">Rain today</div><div class="v" id="rain"></div></div>
+        <div class="stat x-wide"><div class="k">Humidity</div><div class="v" id="humW"></div></div>
+        <div class="stat x-wide"><div class="k">Sunset</div><div class="v" id="sunsetW"></div></div>
       </div>
      </div>
     </div>
@@ -295,7 +320,7 @@
       </div>
 
       <div class="card hours-card">
-        <h2 id="hoursTitle">Next 24 hours</h2>
+        <h2 id="hoursTitle">Hourly</h2>
         <div class="hours" id="hours"></div>
       </div>
 
@@ -303,9 +328,9 @@
         <h2 id="daysTitle">7-day forecast</h2>
         <div id="days"></div>
       </div>
-
-      <div class="foot">Data: <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> · Tap the temperature to refresh · auto-refreshes every 15 min</div>
     </div>
+
+    <div class="foot">Data: <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a><span class="tip"> · Tap the temperature to refresh · auto-refreshes every 15 min</span></div>
   </div>
 </div>
 
@@ -344,8 +369,24 @@
   }
   function saveLoc(l) { try { localStorage.setItem('loc', JSON.stringify(l)); } catch (e) {} }
 
+  // Last good forecast, so a cold start with no network shows something rather than nothing.
+  function saveCache(d) {
+    try { localStorage.setItem('wx', JSON.stringify({ lat: loc.lat, lon: loc.lon, at: Date.now(), data: d })); } catch (e) {}
+  }
+  function loadCache() {
+    try {
+      var s = localStorage.getItem('wx');
+      if (!s) return null;
+      var c = JSON.parse(s);
+      if (!c || !c.data || c.lat !== loc.lat || c.lon !== loc.lon) return null;
+      return c;
+    } catch (e) { return null; }
+  }
+
   var loc = loadLoc();
   var timer = null;
+  var busy = false;         // a fetch is in flight
+  var gen = 0;              // bumped on location change; stale responses are dropped
   var hasData = false;      // have we ever rendered real weather?
   var lastGood = null;      // time of last successful fetch
   var bodyBase = '';        // weather mood class, before the dim class
@@ -360,10 +401,12 @@
     placeName: $('placeName'), updated: $('updated'), msg: $('msg'), main: $('main'),
     curIcon: $('curIcon'), curTemp: $('curTemp'), curCond: $('curCond'), curRange: $('curRange'),
     feels: $('feels'), wind: $('wind'), hum: $('hum'), rain: $('rain'), sunrise: $('sunrise'), sunset: $('sunset'),
+    humW: $('humW'), sunsetW: $('sunsetW'),
     hours: $('hours'), days: $('days'),
     sheet: $('sheet'), q: $('q'), results: $('results'), gpsHint: $('gpsHint'),
     face: $('face'), clockTime: $('clockTime'), clockDate: $('clockDate'),
     hoursTitle: $('hoursTitle'), daysTitle: $('daysTitle'),
+    cdMonth: $('cdMonth'), cdYear: $('cdYear'), cdMonthK: $('cdMonthK'), cdYearK: $('cdYearK'),
     hHand: $('hHand'), mHand: $('mHand'), sHand: $('sHand'), ticks: $('ticks'),
     wrap: document.getElementsByClassName('wrap')[0]
   };
@@ -422,6 +465,13 @@
   }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function hhmm(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  // Time alone if it was today, otherwise the date too — a day-old forecast
+  // reading "Offline · 07:14" would look far fresher than it is.
+  function stamp(d) {
+    var n = new Date();
+    if (d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear()) return hhmm(d);
+    return d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + hhmm(d);
+  }
   function hourLabel(d, now) {
     if (d.getHours() === now.getHours() && d.getDate() === now.getDate()) return 'Now';
     return pad(d.getHours()) + ':00';
@@ -459,6 +509,9 @@
 
   // ---------- fetch + render ----------
   function load() {
+    if (busy) return;       // tap to refresh and the foreground trigger can overlap
+    busy = true;
+    var myGen = gen;
     el.placeName.textContent = loc.name;
 
     var url = API +
@@ -468,10 +521,17 @@
       '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset' +
       '&timezone=auto&forecast_days=7&wind_speed_unit=kmh';
 
-    getJSON(url).then(render, function (err) {
+    // render is chained rather than passed as the success handler, so a throw
+    // inside it lands in the same retry path instead of freezing the display.
+    getJSON(url).then(function (d) {
+      if (myGen !== gen) return;   // the location changed under us
+      render(d);
+    }).then(null, function (err) {
+      if (myGen !== gen) return;
+      busy = false;
       if (hasData) {
         // Keep the last good screen up — a Wi-Fi blip must not blank a bedside display.
-        el.updated.innerHTML = '<span class="stale">Offline \u00b7 ' + hhmm(lastGood) + '</span>';
+        el.updated.innerHTML = '<span class="stale">Offline \u00b7 ' + stamp(lastGood) + '</span>';
         clearTimeout(timer);
         timer = setTimeout(load, 60000);   // retry every minute until it comes back
       } else {
@@ -482,7 +542,8 @@
     });
   }
 
-  function render(d) {
+  // cachedAt is set only when replaying a stored forecast at startup.
+  function render(d, cachedAt) {
     var c = d.current, h = d.hourly, dy = d.daily;
     var now = parseT(c.time);
     var cur = wmo(c.weather_code, c.is_day);
@@ -495,7 +556,8 @@
     applyDim();
 
     el.placeName.textContent = loc.name;
-    el.updated.textContent = '';   // only speaks up when a refresh has failed
+    if (cachedAt) el.updated.innerHTML = '<span class="stale">Offline · ' + stamp(new Date(cachedAt)) + '</span>';
+    else el.updated.textContent = '';   // only speaks up when a refresh has failed
 
     el.curIcon.innerHTML = icon(cur.icon);
     el.curTemp.textContent = r(c.temperature_2m);
@@ -505,16 +567,23 @@
     el.feels.innerHTML = r(c.apparent_temperature) + '<small>°C</small>';
     el.wind.innerHTML = r(c.wind_speed_10m) + '<small>km/h ' + compass(c.wind_direction_10m) + '</small>' +
       (c.wind_gusts_10m >= c.wind_speed_10m + 15 ? '<div class="sub">Gusts ' + r(c.wind_gusts_10m) + ' km/h</div>' : '');
-    el.hum.innerHTML = r(c.relative_humidity_2m) + '<small>%</small>';
+    el.hum.innerHTML = el.humW.innerHTML = r(c.relative_humidity_2m) + '<small>%</small>';
     el.rain.innerHTML = (dy.precipitation_probability_max[0] == null ? '–' : dy.precipitation_probability_max[0]) + '<small>% · ' +
       (dy.precipitation_sum[0] || 0).toFixed(1) + ' mm</small>';
     var sr = parseT(dy.sunrise[0]), ss = parseT(dy.sunset[0]);
     el.sunrise.textContent = hhmm(sr);
-    el.sunset.textContent = hhmm(ss);
-    sunRiseMin = sr.getHours() * 60 + sr.getMinutes();
-    sunSetMin = ss.getHours() * 60 + ss.getMinutes();
+    el.sunset.textContent = el.sunsetW.textContent = hhmm(ss);
+    // Sun times come back in the forecast location's timezone, but the dimming
+    // compares against the iPad's own clock. Shift them if the two differ.
+    var shift = 0;
+    if (typeof d.utc_offset_seconds === 'number') {
+      shift = Math.round((-new Date().getTimezoneOffset() * 60 - d.utc_offset_seconds) / 60);
+    }
+    sunRiseMin = wrapMin(sr.getHours() * 60 + sr.getMinutes() + shift);
+    sunSetMin = wrapMin(ss.getHours() * 60 + ss.getMinutes() + shift);
     hasData = true;
-    lastGood = new Date();
+    lastGood = cachedAt ? new Date(cachedAt) : new Date();
+    if (!cachedAt) saveCache(d);
 
     // hourly: from the current hour, next 24
     var start = 0;
@@ -562,6 +631,7 @@
 
     applyDim();   // sun times are known only now, so re-evaluate immediately
 
+    busy = false;
     clearTimeout(timer);
     timer = setTimeout(load, REFRESH_MS);
   }
@@ -620,6 +690,7 @@
   function setLoc(l) {
     loc = l; saveLoc(l);
     el.sheet.classList.add('hidden');
+    gen++; busy = false;   // abandon anything still in flight for the old place
     load();
   }
 
@@ -627,9 +698,9 @@
   // Landscape shows 7 hours and 4 days; portrait shows the lot. Say what is on screen.
   var wideMQ = window.matchMedia ? window.matchMedia('(min-width: 900px)') : null;
   function isWide() { return wideMQ ? wideMQ.matches : (window.innerWidth >= 900); }
+  // Both lists start at the current hour / today, so "next N" overstated them by one.
   function paintTitles() {
-    el.hoursTitle.textContent = isWide() ? 'Next 7 hours' : 'Next 24 hours';
-    el.daysTitle.textContent  = isWide() ? 'Next 4 days'  : '7-day forecast';
+    el.daysTitle.textContent = isWide() ? '4-day forecast' : '7-day forecast';
   }
   paintTitles();
   window.addEventListener('resize', paintTitles, false);
@@ -654,6 +725,22 @@
   var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var lastMin = -1;
 
+  // ---------- days-left countdown ----------
+  // Whole days remaining after today, so the last day of the month reads 0.
+  // Compared as UTC midnights so a daylight-saving change cannot skew the result.
+  function daysUntil(from, y, mo, da) {
+    var a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+    return Math.round((Date.UTC(y, mo, da) - a) / 86400000);
+  }
+  function paintCountdown(n) {
+    var y = n.getFullYear();
+    var endOfMonth = new Date(y, n.getMonth() + 1, 0).getDate();
+    el.cdMonthK.textContent = MONTHS[n.getMonth()];
+    el.cdYearK.textContent = y;
+    el.cdMonth.innerHTML = daysUntil(n, y, n.getMonth(), endOfMonth) + '<small>d</small>';
+    el.cdYear.innerHTML = daysUntil(n, y, 11, 31) + '<small>d</small>';
+  }
+
   function tick() {
     var n = new Date();
     var h = n.getHours(), m = n.getMinutes(), sec = n.getSeconds();
@@ -662,20 +749,27 @@
     el.mHand.setAttribute('transform', 'rotate(' + (m * 6 + sec * 0.1) + ' 100 100)');
     el.sHand.setAttribute('transform', 'rotate(' + (sec * 6) + ' 100 100)');
 
+    // Every second, not just on the minute, so the tap to brighten window
+    // expires at 30s rather than whenever the next minute happens to arrive.
+    applyDim();
+
     if (m !== lastMin) {
       lastMin = m;
       el.clockTime.textContent = pad(h) + ':' + pad(m);
       el.clockDate.textContent = DAYS[n.getDay()] + ', ' + n.getDate() + ' ' + MONTHS[n.getMonth()];
-      applyDim();
+      paintCountdown(n);
       shiftPixels(n);
     }
   }
 
   // ---------- night dimming ----------
+  function wrapMin(m) { m %= 1440; return m < 0 ? m + 1440 : m; }
   function isNight(n) {
     if (sunRiseMin === null) return false;
     var m = n.getHours() * 60 + n.getMinutes();
-    return (m < sunRiseMin) || (m >= sunSetMin);
+    // Shifting for a distant timezone can put daylight either side of midnight.
+    if (sunSetMin > sunRiseMin) return (m < sunRiseMin) || (m >= sunSetMin);
+    return (m >= sunSetMin) && (m < sunRiseMin);
   }
   function applyDim() {
     var want = dimOn && isNight(new Date()) && Date.now() > wakeUntil;
@@ -717,7 +811,23 @@
     if (!document.hidden) load();
   });
 
+  // Paint the stored forecast first so a cold start with no network is never blank,
+  // then go for fresh data. A failure here must not stop the fetch below.
+  (function () {
+    var c = loadCache();
+    if (!c) return;
+    try { render(c.data, c.at); } catch (e) {}
+  })();
+
   load();
+
+  // Offline shell. Network first, so an upload to GitHub Pages shows up on the next
+  // relaunch rather than a relaunch later; the cache is only the fallback.
+  if ('serviceWorker' in navigator && secure) {   // https, or localhost while testing
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').then(null, function () {});
+    }, false);
+  }
 })();
 </script>
 </body>
